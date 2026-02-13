@@ -93,29 +93,24 @@ class OpenerCommandLine : ApplicationStarter {
 
             val targetName = if (optionalName.isNotEmpty()) optionalName else "(generated) $connectionUrl"
 
-            // Check if a data source with the same name already exists
-            val existingDs = DataSourceStorage.getStorage().dataSources.find { el ->
-                el.name == targetName
+            // Get project-specific data source storage
+            val storage = LocalDataSourceManager.getInstance(currentProject)
+
+            // Remove any existing data sources with the same name or URL
+            storage.dataSources.filter { el ->
+                el.name == targetName || el.url == connectionUrl
+            }.forEach { existingDs ->
+                storage.removeDataSource(existingDs)
             }
 
-            val ds: LocalDataSource = if (existingDs != null) {
-                // Update existing data source
-                existingDs.databaseDriver = driver
-                existingDs.url = connectionUrl
-                existingDs.username = user
-                existingDs.passwordStorage = LocalDataSource.Storage.PERSIST
-                existingDs
-            } else {
-                // Create new data source
-                val newDs = LocalDataSource()
-                newDs.name = targetName
-                newDs.databaseDriver = driver
-                newDs.url = connectionUrl
-                newDs.username = user
-                newDs.passwordStorage = LocalDataSource.Storage.PERSIST
-                DataSourceStorage.getStorage().addDataSource(newDs)
-                newDs
-            }
+            // Create new data source with current settings
+            val ds = LocalDataSource()
+            ds.name = targetName
+            ds.databaseDriver = driver
+            ds.url = connectionUrl
+            ds.username = user
+            ds.passwordStorage = LocalDataSource.Storage.PERSIST
+            storage.addDataSource(ds)
 
             // Store password
             DatabaseCredentials.getInstance().storePassword(ds, OneTimeString(password))
