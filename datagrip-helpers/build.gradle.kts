@@ -1,3 +1,6 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.intellij.platform.gradle.ProductMode
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.20"
@@ -17,13 +20,11 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
-        intellijIdea("2025.2.4")
-        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
+        datagrip("2025.2.4")
 
-        // Add plugin dependencies for compilation here:
-
-
+        // Explicitly add plugins that need ultimate
         bundledPlugin("com.intellij.database")
+        //bundledPlugin("com.intellij.java")
     }
 }
 
@@ -37,6 +38,8 @@ intellijPlatform {
             Initial version
         """.trimIndent()
     }
+
+    sandboxContainer = file("${project.buildDir}/idea-sandbox-ultimate")
 }
 
 tasks {
