@@ -4,14 +4,24 @@ import com.intellij.credentialStore.OneTimeString
 import com.intellij.database.access.DatabaseCredentials
 import com.intellij.database.dataSource.*
 import com.intellij.database.dataSource.validation.DatabaseDriverValidator
+import com.intellij.database.model.ObjectKind
+import com.intellij.database.model.ObjectName
+import com.intellij.database.psi.DbDataSource
+import com.intellij.database.util.DataSourceUtil
 import com.intellij.database.util.DbImplUtil
+import com.intellij.database.util.TreePattern
+import com.intellij.database.util.TreePatternNode
+import com.intellij.database.util.TreePatternUtils
 import com.intellij.ide.CliResult
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.application.ApplicationStarter
 import com.intellij.openapi.application.ApplicationStarterBase
+import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.util.OpenSourceUtil
 import java.util.concurrent.CompletableFuture
@@ -73,20 +83,6 @@ class OpenerCommandLine : ApplicationStarter {
 
             val driver: DatabaseDriver = instance.getDriver(driverName)
 
-            val ds = LocalDataSource() // note: the one using the password is deprecated
-
-            if (optionalName.isNotEmpty()) {
-                ds.name = optionalName
-            } else {
-                ds.name = "(generated) $connectionUrl"
-            }
-
-            ds.databaseDriver = driver
-            ds.url = connectionUrl
-            ds.username = user
-            ds.passwordStorage = LocalDataSource.Storage.PERSIST
-
-
             val currentProject: Project? = PlatformDataKeys.PROJECT.getData(
                 DataManager.getInstance().dataContextFromFocus.result
             )
@@ -95,31 +91,86 @@ class OpenerCommandLine : ApplicationStarter {
                 throw RuntimeException("Current project could not be found");
             }
 
+            val targetName = if (optionalName.isNotEmpty()) optionalName else "(generated) $connectionUrl"
+
+            // Check if a data source with the same name already exists
+            val existingDs = DataSourceStorage.getStorage().dataSources.find { el ->
+                el.name == targetName
+            }
+
+            val ds: LocalDataSource = if (existingDs != null) {
+                // Update existing data source
+                existingDs.databaseDriver = driver
+                existingDs.url = connectionUrl
+                existingDs.username = user
+                existingDs.passwordStorage = LocalDataSource.Storage.PERSIST
+                existingDs
+            } else {
+                // Create new data source
+                val newDs = LocalDataSource()
+                newDs.name = targetName
+                newDs.databaseDriver = driver
+                newDs.url = connectionUrl
+                newDs.username = user
+                newDs.passwordStorage = LocalDataSource.Storage.PERSIST
+                DataSourceStorage.getStorage().addDataSource(newDs)
+                newDs
+            }
+
+            // Store password
             DatabaseCredentials.getInstance().storePassword(ds, OneTimeString(password))
             ds.resolveDriver()
             ds.ensureDriverConfigured()
-            DataSourceStorage.getStorage().dataSources.filter { el ->
-                el.name == ds.name
-            }.forEach { existingDs ->
-                DataSourceStorage.getStorage().removeDataSource(existingDs)
+
+            // Enable auto-sync for the data source
+            ds.isAutoSynchronize = true
+
+            // Configure schema selection to select all schemas
+            try {
+                val schemaMapping: DataSourceSchemaMapping = ds.schemaMapping ?: DataSourceSchemaMapping()
+
+                // Create a TreePattern that matches all schemas (wildcard pattern)
+                val nullObjectName = ObjectName.NULL
+                val schemaNode = TreePatternUtils.create(nullObjectName, ObjectKind.SCHEMA)
+                val allSchemasPattern = TreePattern(schemaNode)
+
+                schemaMapping.setIntrospectionScope(allSchemasPattern)
+                ds.schemaMapping = schemaMapping
+            } catch (e: Exception) {
+                // Silently fail - schema selection will need to be done manually
             }
-            DataSourceStorage.getStorage().addDataSource(ds)
 
+            // Run blocking operations in a background task
+            val future = CompletableFuture<CliResult>()
 
-            /*val dbDataSource: DbDataSource? = DbImplUtil.getDbDataSource(currentProject, ds)
+            ProgressManager.getInstance().run(object : Task.Backgroundable(currentProject, "Connecting to Database", false) {
+                override fun run(indicator: ProgressIndicator) {
+                    try {
+                        indicator.text = "Downloading database drivers..."
+                        downloadDrivers(ds)
 
-            if (dbDataSource == null) {
-                throw RuntimeException("dbDataSource could not be found");
-            }*/
+                        indicator.text = "Connecting and syncing schema..."
+                        // Get the DbDataSource for further operations
+                        val dbDataSource: DbDataSource? = DbImplUtil.getDbDataSource(project, ds)
 
-            // Triggering download of source:
-            downloadDrivers(ds)
+                        if (dbDataSource != null) {
+                            // Sync the schema (this will also trigger connection)
+                            DataSourceUtil.performAutoSyncTask(project, ds)
 
-            DataSourceStorage.getStorage()
+                            // Open/navigate to the data source (opens console) - must be done on EDT
+                            invokeLater {
+                                OpenSourceUtil.navigate(true, true, dbDataSource)
+                            }
+                        }
 
-            //OpenSourceUtil.navigate(true, true, dbDataSource)
+                        future.complete(CliResult.OK)
+                    } catch (e: Exception) {
+                        future.completeExceptionally(e)
+                    }
+                }
+            })
 
-            return CompletableFuture.completedFuture(CliResult.OK)
+            return future
         }
 
         // see https://github.com/kassak/dg-exposer/blob/d944fdcbb77b47bc37501f4b223427f7c0435112/dg-exposer/main/src/com/github/kassak/intellij/expose/ProjectHandler.java#L131
