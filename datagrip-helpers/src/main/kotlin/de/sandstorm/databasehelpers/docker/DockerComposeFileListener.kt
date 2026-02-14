@@ -1,4 +1,4 @@
-package de.sandstorm.datagriphelpers.docker
+package de.sandstorm.databasehelpers.docker
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger

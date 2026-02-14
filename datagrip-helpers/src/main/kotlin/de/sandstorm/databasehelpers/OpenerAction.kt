@@ -1,4 +1,4 @@
-package de.sandstorm.datagriphelpers;
+package de.sandstorm.databasehelpers;
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent

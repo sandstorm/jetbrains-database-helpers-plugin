@@ -1,20 +1,32 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
-    <id>de.sandstorm.datagrip-helpers.datagrip-helpers</id>
+    <id>de.sandstorm.database-helpers</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>Datagrip-helpers</name>
+    <name>Database Helpers</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor email="kontakt@sandstorm.de" url="https://sandstorm.de">Sandstorm Media</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        Simplifies database connection management in DataGrip and IntelliJ IDEA Ultimate.
+        <br><br>
+        <b>Features:</b>
+        <ul>
+            <li>Automatically creates data sources from docker-compose files</li>
+            <li>Detects PostgreSQL, MySQL, and MariaDB containers</li>
+            <li>Extracts credentials from environment variables and port mappings</li>
+            <li>Updates data sources when docker-compose files change</li>
+            <li>Command-line interface for opening database connections</li>
+        </ul>
+        <br>
+        <b>Zero configuration required</b> - just open a project with docker-compose files and data sources are created automatically.
+        <br><br>
+        Created by <a href="https://sandstorm.de">Sandstorm Media</a>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -25,17 +37,17 @@
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <appStarter id="opensql" implementation="de.sandstorm.datagriphelpers.OpenerCommandLine" />
-        <backgroundPostStartupActivity implementation="de.sandstorm.datagriphelpers.docker.DockerComposeStartupActivity" />
+        <appStarter id="opensql" implementation="de.sandstorm.databasehelpers.OpenerCommandLine" />
+        <backgroundPostStartupActivity implementation="de.sandstorm.databasehelpers.docker.DockerComposeStartupActivity" />
         <notificationGroup id="DataGrip Helpers" displayType="BALLOON" />
     </extensions>
 
     <applicationListeners>
-        <listener class="de.sandstorm.datagriphelpers.docker.DockerComposeFileListener"
+        <listener class="de.sandstorm.databasehelpers.docker.DockerComposeFileListener"
                   topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>
     <actions>
-        <action id="de.sandstorm.datagriphelpers.OpenerAction" class="de.sandstorm.datagriphelpers.OpenerAction"
+        <action id="de.sandstorm.databasehelpers.OpenerAction" class="de.sandstorm.databasehelpers.OpenerAction"
                 text="DataGrip Test Opener Action" />
     </actions>
 </idea-plugin>

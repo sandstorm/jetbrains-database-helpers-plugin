@@ -1,4 +1,4 @@
-package de.sandstorm.datagriphelpers.docker
+package de.sandstorm.databasehelpers.docker
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty

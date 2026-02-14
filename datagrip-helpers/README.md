@@ -57,6 +57,56 @@ datagrip opensql postgresql jdbc:postgresql://localhost:5432/postgres admin pass
 ./gradlew runIde
 ```
 
+### Building Distribution JAR
+
+Build the plugin distribution file:
+```bash
+./gradlew buildPlugin
+```
+
+The plugin JAR will be located at:
+```
+build/distributions/datagrip-helpers-*.zip
+```
+
+### Publishing to JetBrains Marketplace
+
+**Option 1: Gradle Task (Automated)**
+
+Set up plugin signing and authentication:
+```bash
+# Add to gradle.properties or environment variables
+PUBLISH_TOKEN=your_jetbrains_marketplace_token
+```
+
+Publish the plugin:
+```bash
+./gradlew publishPlugin
+```
+
+**Option 2: Manual Upload (Recommended for first release)**
+
+1. Build the distribution: `./gradlew buildPlugin`
+2. Go to [JetBrains Plugin Repository](https://plugins.jetbrains.com/plugin/upload)
+3. Sign in with your JetBrains account
+4. Click "Upload Plugin"
+5. Select the ZIP file from `build/distributions/`
+6. Fill in plugin details (description, changelog, etc.)
+7. Submit for review
+
+**Plugin Submission Guidelines:**
+- Follow [JetBrains Marketplace Quality Guidelines](https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html)
+- Include clear description and screenshots
+- Provide comprehensive changelog for updates
+- Test thoroughly before submission
+
+**Marketplace Token:**
+To get a publish token:
+1. Go to [JetBrains Account](https://account.jetbrains.com/hub/)
+2. Navigate to Profile → Access Tokens
+3. Create new token with "Marketplace" scope
+4. Use token in `gradle.properties` or environment variable
+
 ### References & Prior Work
 
 **Feature Requests:**

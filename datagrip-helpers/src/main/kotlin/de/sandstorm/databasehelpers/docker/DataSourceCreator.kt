@@ -1,11 +1,11 @@
-package de.sandstorm.datagriphelpers.docker
+package de.sandstorm.databasehelpers.docker
 
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import de.sandstorm.datagriphelpers.OpenerCommandLine
+import de.sandstorm.databasehelpers.OpenerCommandLine
 
 class DataSourceCreator {
     private val logger = Logger.getInstance(DataSourceCreator::class.java)

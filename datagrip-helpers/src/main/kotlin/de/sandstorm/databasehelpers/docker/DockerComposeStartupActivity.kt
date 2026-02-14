@@ -1,4 +1,4 @@
-package de.sandstorm.datagriphelpers.docker
+package de.sandstorm.databasehelpers.docker
 
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
@@ -6,8 +6,6 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.search.FilenameIndex
-import com.intellij.psi.search.GlobalSearchScope
 
 class DockerComposeStartupActivity : ProjectActivity, DumbAware {
     private val logger = Logger.getInstance(DockerComposeStartupActivity::class.java)

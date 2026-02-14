@@ -1,4 +1,4 @@
-package de.sandstorm.datagriphelpers;
+package de.sandstorm.databasehelpers;
 
 import com.intellij.credentialStore.OneTimeString
 import com.intellij.database.access.DatabaseCredentials
