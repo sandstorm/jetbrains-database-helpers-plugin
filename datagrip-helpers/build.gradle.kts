@@ -1,12 +1,55 @@
 
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.20"
     id("org.jetbrains.intellij.platform") version "2.10.2"
 }
 
+// ValueSource for configuration-cache-compatible git version computation
+abstract class GitVersionValueSource : ValueSource<String, ValueSourceParameters.None> {
+    override fun obtain(): String {
+        fun executeGit(vararg args: String): String? {
+            return try {
+                val process = ProcessBuilder("git", *args)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                    .redirectError(ProcessBuilder.Redirect.PIPE)
+                    .start()
+                process.waitFor()
+                if (process.exitValue() == 0) {
+                    process.inputStream.bufferedReader().readText().trim()
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        // Check if we're currently on a tag
+        executeGit("describe", "--tags", "--exact-match")?.let { tag ->
+            return tag.removePrefix("v")
+        }
+
+        // Get the last tag and increment
+        executeGit("describe", "--tags", "--abbrev=0")?.let { lastTag ->
+            val version = lastTag.removePrefix("v")
+            val parts = version.split(".")
+            val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+            val minor = parts.getOrNull(1)?.toIntOrNull() ?: 1
+            val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+            return "$major.$minor.${patch + 1}-SNAPSHOT"
+        }
+
+        // No tags found, use default
+        return "0.1.0-SNAPSHOT"
+    }
+}
+
 group = "de.sandstorm.databasehelpers"
-version = "0.5.0-SNAPSHOT"
+version = providers.of(GitVersionValueSource::class.java) {}.get()
 
 repositories {
     mavenCentral()
