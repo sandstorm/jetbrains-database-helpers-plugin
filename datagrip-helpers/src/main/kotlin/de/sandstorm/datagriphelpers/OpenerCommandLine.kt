@@ -10,13 +10,11 @@ import com.intellij.database.psi.DbDataSource
 import com.intellij.database.util.DataSourceUtil
 import com.intellij.database.util.DbImplUtil
 import com.intellij.database.util.TreePattern
-import com.intellij.database.util.TreePatternNode
 import com.intellij.database.util.TreePatternUtils
 import com.intellij.ide.CliResult
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.application.ApplicationStarter
-import com.intellij.openapi.application.ApplicationStarterBase
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressIndicator
@@ -66,12 +64,33 @@ class OpenerCommandLine : ApplicationStarter {
         return CliResult.OK
     }
     companion object {
+
         fun process(
             driverName: String,
             connectionUrl: String,
             user: String,
             password: String,
             optionalName: String
+        ): Future<CliResult> {
+            val currentProject: Project? = PlatformDataKeys.PROJECT.getData(
+                DataManager.getInstance().dataContextFromFocus.result
+            )
+
+            if (currentProject == null) {
+                throw RuntimeException("Current project could not be found");
+            }
+
+            return process(currentProject, driverName, connectionUrl, user, password, optionalName, null)
+        }
+
+        fun process(
+            currentProject: Project,
+            driverName: String,
+            connectionUrl: String,
+            user: String,
+            password: String,
+            optionalName: String,
+            comment: String? = null
         ): Future<CliResult> {
             val instance: DatabaseDriverManager = DatabaseDriverManagerImpl.getInstance()
             val containsDriver = instance.drivers.find { driver -> driver.id == driverName } !== null
@@ -83,64 +102,74 @@ class OpenerCommandLine : ApplicationStarter {
 
             val driver: DatabaseDriver = instance.getDriver(driverName)
 
-            val currentProject: Project? = PlatformDataKeys.PROJECT.getData(
-                DataManager.getInstance().dataContextFromFocus.result
-            )
-
-            if (currentProject == null) {
-                throw RuntimeException("Current project could not be found");
-            }
-
             val targetName = if (optionalName.isNotEmpty()) optionalName else "(generated) $connectionUrl"
-
-            // Get project-specific data source storage
-            val storage = LocalDataSourceManager.getInstance(currentProject)
-
-            // Remove any existing data sources with the same name or URL
-            storage.dataSources.filter { el ->
-                el.name == targetName || el.url == connectionUrl
-            }.forEach { existingDs ->
-                storage.removeDataSource(existingDs)
-            }
-
-            // Create new data source with current settings
-            val ds = LocalDataSource()
-            ds.name = targetName
-            ds.databaseDriver = driver
-            ds.url = connectionUrl
-            ds.username = user
-            ds.passwordStorage = LocalDataSource.Storage.PERSIST
-            storage.addDataSource(ds)
-
-            // Store password
-            DatabaseCredentials.getInstance().storePassword(ds, OneTimeString(password))
-            ds.resolveDriver()
-            ds.ensureDriverConfigured()
-
-            // Enable auto-sync for the data source
-            ds.isAutoSynchronize = true
-
-            // Configure schema selection to select all schemas
-            try {
-                val schemaMapping: DataSourceSchemaMapping = ds.schemaMapping ?: DataSourceSchemaMapping()
-
-                // Create a TreePattern that matches all schemas (wildcard pattern)
-                val nullObjectName = ObjectName.NULL
-                val schemaNode = TreePatternUtils.create(nullObjectName, ObjectKind.SCHEMA)
-                val allSchemasPattern = TreePattern(schemaNode)
-
-                schemaMapping.setIntrospectionScope(allSchemasPattern)
-                ds.schemaMapping = schemaMapping
-            } catch (e: Exception) {
-                // Silently fail - schema selection will need to be done manually
-            }
 
             // Run blocking operations in a background task
             val future = CompletableFuture<CliResult>()
 
-            ProgressManager.getInstance().run(object : Task.Backgroundable(currentProject, "Connecting to Database", false) {
+            // Quick data source creation on EDT, then move to background for slow operations
+            invokeLater {
+                try {
+                    // Get project-specific data source storage
+                    val storage = LocalDataSourceManager.getInstance(currentProject)
+
+                    // Remove any existing data sources with the same name or URL
+                    storage.dataSources.filter { el ->
+                        el.name == targetName || el.url == connectionUrl
+                    }.forEach { existingDs ->
+                        storage.removeDataSource(existingDs)
+                    }
+
+                    // Create new data source with current settings (quick UI operation)
+                    val ds = LocalDataSource()
+                    ds.name = targetName
+                    ds.databaseDriver = driver
+                    ds.url = connectionUrl
+                    ds.username = user
+                    ds.passwordStorage = LocalDataSource.Storage.PERSIST
+                    if (comment != null) {
+                        ds.comment = comment
+                    }
+                    ds.isAutoSynchronize = true
+
+                    storage.addDataSource(ds)
+
+                    // Move slow operations to background task
+                    runBackgroundTask(currentProject, ds, password, future)
+                } catch (e: Exception) {
+                    future.completeExceptionally(e)
+                }
+            }
+
+            return future
+        }
+
+
+        private fun runBackgroundTask(project: Project, ds: LocalDataSource, password: String, future: CompletableFuture<CliResult>) {
+            ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Connecting to Database", false) {
                 override fun run(indicator: ProgressIndicator) {
                     try {
+                        indicator.text = "Configuring data source..."
+
+                        // Store password (slow I/O operation - safe in background)
+                        DatabaseCredentials.getInstance().storePassword(ds, OneTimeString(password))
+
+                        // Resolve and configure driver
+                        ds.resolveDriver()
+                        ds.ensureDriverConfigured()
+
+                        // Configure schema selection to select all schemas
+                        try {
+                            val schemaMapping: DataSourceSchemaMapping = ds.schemaMapping ?: DataSourceSchemaMapping()
+                            val nullObjectName = ObjectName.NULL
+                            val schemaNode = TreePatternUtils.create(nullObjectName, ObjectKind.SCHEMA)
+                            val allSchemasPattern = TreePattern(schemaNode)
+                            schemaMapping.setIntrospectionScope(allSchemasPattern)
+                            ds.schemaMapping = schemaMapping
+                        } catch (e: Exception) {
+                            // Silently fail - schema selection will need to be done manually
+                        }
+
                         indicator.text = "Downloading database drivers..."
                         downloadDrivers(ds)
 
@@ -164,8 +193,6 @@ class OpenerCommandLine : ApplicationStarter {
                     }
                 }
             })
-
-            return future
         }
 
         // see https://github.com/kassak/dg-exposer/blob/d944fdcbb77b47bc37501f4b223427f7c0435112/dg-exposer/main/src/com/github/kassak/intellij/expose/ProjectHandler.java#L131

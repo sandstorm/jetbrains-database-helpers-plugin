@@ -1,117 +1,103 @@
-# IntelliJ Platform Plugin Template
+# DataGrip Helpers
 
-[![Twitter Follow](https://img.shields.io/badge/follow-%40JBPlatform-1DA1F2?logo=twitter)](https://twitter.com/JBPlatform)
-[![Developers Forum](https://img.shields.io/badge/JetBrains%20Platform-Join-blue)][jb:forum]
+A DataGrip plugin that simplifies database connection management. Opinionated, by https://sandstorm.de
 
-## Plugin template structure
+## Features
 
-A generated project contains the following content structure:
+### 🐳 Docker Compose Auto-DataSource
 
+Automatically creates DataGrip data sources from your docker-compose files.
+
+**Supported Databases:**
+- PostgreSQL
+- MySQL
+- MariaDB
+
+**How it works:**
+1. **On project open**: Scans for `docker-compose*.yml/yaml` files (up to 2 directory levels deep)
+2. **On file changes**: Detects when docker-compose files are modified
+3. **Auto-creates data sources**: Extracts credentials from environment variables and port mappings
+
+**Example:**
+```yaml
+services:
+  postgres:
+    image: postgres:14
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret123
 ```
-.
-├── .run/                   Predefined Run/Debug Configurations
-├── build/                  Output build directory
-├── gradle
-│   ├── wrapper/            Gradle Wrapper
-├── src                     Plugin sources
-│   ├── main
-│   │   ├── kotlin/         Kotlin production sources
-│   │   └── resources/      Resources - plugin.xml, icons, messages
-├── .gitignore              Git ignoring rules
-├── build.gradle.kts        Gradle build configuration
-├── gradle.properties       Gradle configuration properties
-├── gradlew                 *nix Gradle Wrapper script
-├── gradlew.bat             Windows Gradle Wrapper script
-├── README.md               README
-└── settings.gradle.kts     Gradle project settings
+
+Creates data source: **Docker: postgres** → `jdbc:postgresql://localhost:15432/mydb`
+
+Each data source includes a comment noting it was auto-created from the docker-compose file.
+
+### 📟 Command Line Interface
+
+Open database connections from the command line:
+
+```bash
+datagrip opensql postgresql jdbc:postgresql://localhost:5432/postgres admin password "My DB"
 ```
 
-In addition to the configuration files, the most crucial part is the `src` directory, which contains our implementation
-and the manifest for our plugin – [plugin.xml][file:plugin.xml].
+**Supported drivers:** postgresql, mysql, mariadb, and all other DataGrip-supported drivers
 
-> [!NOTE]
-> To use Java in your plugin, create the `/src/main/java` directory.
+## Development
 
-## Plugin configuration file
+### Building
+```bash
+./gradlew build
+```
 
-The plugin configuration file is a [plugin.xml][file:plugin.xml] file located in the `src/main/resources/META-INF`
-directory.
-It provides general information about the plugin, its dependencies, extensions, and listeners.
+### Running
+```bash
+./gradlew runIde
+```
 
-You can read more about this file in the [Plugin Configuration File][docs:plugin.xml] section of our documentation.
+### References & Prior Work
 
-If you're still not quite sure what this is all about, read our
-introduction: [What is the IntelliJ Platform?][docs:intro]
+**Feature Requests:**
+- [Ability to connect to a database from the command line](https://intellij-support.jetbrains.com/hc/en-us/community/posts/115000180404-Ability-to-connect-to-a-database-from-the-command-line)
+- [YouTrack: DBE-7685](https://youtrack.jetbrains.com/issue/DBE-7685)
 
-$H$H Predefined Run/Debug configurations
+**Targeting DataGrip:**
+- [Configuring Plugin Projects Targeting DataGrip](https://plugins.jetbrains.com/docs/intellij/data-grip.html#configuring-plugin-projects-targeting-datagrip)
 
-Within the default project structure, there is a `.run` directory provided containing predefined *Run/Debug
-configurations* that expose corresponding Gradle tasks:
+**CLI Integration:**
+- Uses `com.intellij.appStarter` extension point ([docs](https://plugins.jetbrains.com/docs/intellij/extension-point-list.html#langextensionpointsxml))
+- Example: [FormatterStarter.java](https://github.com/Mizzlr/intellij-community/blob/7e1217822045325b2e9269505d07c65daa9e5e9d/platform/lang-impl/src/com/intellij/formatting/commandLine/FormatterStarter.java)
 
-| Configuration name | Description                                                                                                                                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Run Plugin         | Runs [`:runIde`][gh:intellij-platform-gradle-plugin-runIde] IntelliJ Platform Gradle Plugin task. Use the *Debug* icon for plugin debugging.                                        |
-| Run Tests          | Runs [`:test`][gradle:lifecycle-tasks] Gradle task.                                                                                                                                 |
-| Run Verifications  | Runs [`:verifyPlugin`][gh:intellij-platform-gradle-plugin-verifyPlugin] IntelliJ Platform Gradle Plugin task to check the plugin compatibility against the specified IntelliJ IDEs. |
+**DataSource Creation API:**
 
-> [!NOTE]
-> You can find the logs from the running task in the `idea.log` tab.
+```kotlin
+// Get driver instance
+val instance = DatabaseDriverManagerImpl.getInstance()
+val driver = instance.getDriver("postgresql")
 
-## Publishing the plugin
+// Create data source
+val ds = LocalDataSource()
+ds.name = "Test Data Source"
+ds.databaseDriver = driver
+ds.url = "jdbc:postgresql://localhost:5432/test_database"
+ds.username = "user"
 
-> [!TIP]
-> Make sure to follow all guidelines listed in [Publishing a Plugin][docs:publishing] to follow all recommended and
-> required steps.
+// Add to project
+LocalDataSourceManager.getInstance(project).addDataSource(ds)
 
-Releasing a plugin to [JetBrains Marketplace](https://plugins.jetbrains.com) is a straightforward operation that uses
-the `publishPlugin` Gradle task provided by
-the [intellij-platform-gradle-plugin][gh:intellij-platform-gradle-plugin-docs].
+// Navigate to data source
+val dbDataSource = DbImplUtil.getDbDataSource(project, ds)
+if (dbDataSource != null) {
+    OpenSourceUtil.navigate(true, true, dbDataSource)
+}
+```
 
-You can also upload the plugin to the [JetBrains Plugin Repository](https://plugins.jetbrains.com/plugin/upload)
-manually via UI.
+**Community Discussions:**
+- [Is it possible to create a data source via an API?](https://intellij-support.jetbrains.com/hc/en-us/community/posts/115000690844-Is-it-possible-to-create-a-data-source-via-an-API-) (2021)
+- [YouTrack: IJSDK-328](https://youtrack.jetbrains.com/issue/IJSDK-328) (2017)
 
-## Useful links
+## License
 
-- [IntelliJ Platform SDK Plugin SDK][docs]
-- [IntelliJ Platform Gradle Plugin Documentation][gh:intellij-platform-gradle-plugin-docs]
-- [IntelliJ Platform Explorer][jb:ipe]
-- [JetBrains Marketplace Quality Guidelines][jb:quality-guidelines]
-- [IntelliJ Platform UI Guidelines][jb:ui-guidelines]
-- [JetBrains Marketplace Paid Plugins][jb:paid-plugins]
-- [IntelliJ SDK Code Samples][gh:code-samples]
-
-[docs]: https://plugins.jetbrains.com/docs/intellij
-
-[docs:intro]: https://plugins.jetbrains.com/docs/intellij/intellij-platform.html?from=IJPluginTemplate
-
-[docs:plugin.xml]: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html?from=IJPluginTemplate
-
-[docs:publishing]: https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate
-
-[file:plugin.xml]: ./src/main/resources/META-INF/plugin.xml
-
-[gh:code-samples]: https://github.com/JetBrains/intellij-sdk-code-samples
-
-[gh:intellij-platform-gradle-plugin]: https://github.com/JetBrains/intellij-platform-gradle-plugin
-
-[gh:intellij-platform-gradle-plugin-docs]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
-
-[gh:intellij-platform-gradle-plugin-runIde]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#runIde
-
-[gh:intellij-platform-gradle-plugin-verifyPlugin]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#verifyPlugin
-
-[gradle:lifecycle-tasks]: https://docs.gradle.org/current/userguide/java_plugin.html#lifecycle_tasks
-
-[jb:github]: https://github.com/JetBrains/.github/blob/main/profile/README.md
-
-[jb:forum]: https://platform.jetbrains.com/
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:paid-plugins]: https://plugins.jetbrains.com/docs/marketplace/paid-plugins-marketplace.html
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:ipe]: https://jb.gg/ipe
-
-[jb:ui-guidelines]: https://jetbrains.github.io/ui
+MIT License

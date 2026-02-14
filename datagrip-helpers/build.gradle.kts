@@ -26,6 +26,10 @@ dependencies {
         bundledPlugin("com.intellij.database")
         //bundledPlugin("com.intellij.java")
     }
+
+    // Jackson YAML for parsing docker-compose files
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.0")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
 }
 
 intellijPlatform {

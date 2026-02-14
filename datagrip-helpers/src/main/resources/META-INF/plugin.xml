@@ -26,7 +26,14 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <appStarter id="opensql" implementation="de.sandstorm.datagriphelpers.OpenerCommandLine" />
+        <backgroundPostStartupActivity implementation="de.sandstorm.datagriphelpers.docker.DockerComposeStartupActivity" />
+        <notificationGroup id="DataGrip Helpers" displayType="BALLOON" />
     </extensions>
+
+    <applicationListeners>
+        <listener class="de.sandstorm.datagriphelpers.docker.DockerComposeFileListener"
+                  topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+    </applicationListeners>
     <actions>
         <action id="de.sandstorm.datagriphelpers.OpenerAction" class="de.sandstorm.datagriphelpers.OpenerAction"
                 text="DataGrip Test Opener Action" />
