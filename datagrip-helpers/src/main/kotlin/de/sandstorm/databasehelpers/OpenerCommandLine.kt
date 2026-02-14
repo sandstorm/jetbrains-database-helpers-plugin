@@ -13,7 +13,7 @@ import com.intellij.database.util.TreePattern
 import com.intellij.database.util.TreePatternUtils
 import com.intellij.ide.CliResult
 import com.intellij.ide.DataManager
-import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.ApplicationStarter
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.progress.EmptyProgressIndicator
@@ -72,15 +72,31 @@ class OpenerCommandLine : ApplicationStarter {
             password: String,
             optionalName: String
         ): Future<CliResult> {
-            val currentProject: Project? = PlatformDataKeys.PROJECT.getData(
-                DataManager.getInstance().dataContextFromFocus.result
-            )
+            val future = CompletableFuture<CliResult>()
 
-            if (currentProject == null) {
-                throw RuntimeException("Current project could not be found");
+            DataManager.getInstance().dataContextFromFocusAsync.onSuccess { dataContext ->
+                val currentProject = CommonDataKeys.PROJECT.getData(dataContext)
+                if (currentProject == null) {
+                    future.completeExceptionally(RuntimeException("Current project could not be found"))
+                } else {
+                    try {
+                        val result = process(currentProject, driverName, connectionUrl, user, password, optionalName, null) as CompletableFuture<CliResult>
+                        result.whenComplete { cliResult, error ->
+                            if (error != null) {
+                                future.completeExceptionally(error)
+                            } else {
+                                future.complete(cliResult)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        future.completeExceptionally(e)
+                    }
+                }
+            }.onError { error ->
+                future.completeExceptionally(RuntimeException("Failed to get data context: $error"))
             }
 
-            return process(currentProject, driverName, connectionUrl, user, password, optionalName, null)
+            return future
         }
 
         fun process(
@@ -178,10 +194,8 @@ class OpenerCommandLine : ApplicationStarter {
                         val dbDataSource: DbDataSource? = DbImplUtil.getDbDataSource(project, ds)
 
                         if (dbDataSource != null) {
-                            // Sync the schema (this will also trigger connection)
-                            DataSourceUtil.performAutoSyncTask(project, ds)
-
                             // Open/navigate to the data source (opens console) - must be done on EDT
+                            // This will automatically trigger connection and schema sync
                             invokeLater {
                                 OpenSourceUtil.navigate(true, true, dbDataSource)
                             }

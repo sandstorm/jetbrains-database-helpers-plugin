@@ -57,6 +57,14 @@ datagrip opensql postgresql jdbc:postgresql://localhost:5432/postgres admin pass
 ./gradlew runIde
 ```
 
+### Verifying Plugin Compatibility
+
+```bash
+./gradlew verifyPlugin
+```
+
+**Note:** The `verifyPlugin` task requires IDE versions to be configured in `build.gradle.kts`. To verify against recommended IDE versions, ensure the `intellijPlatform.pluginVerification.ides` block is configured.
+
 ### Building Distribution JAR
 
 Build the plugin distribution file:

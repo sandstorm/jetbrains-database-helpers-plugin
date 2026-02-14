@@ -4,6 +4,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.VirtualFile
 
@@ -29,7 +30,7 @@ class DockerComposeStartupActivity : ProjectActivity, DumbAware {
 
             try {
                 // Scan project base directory and subdirectories (max 2 levels deep)
-                val baseDir = project.baseDir
+                val baseDir = project.guessProjectDir()
                 if (baseDir != null) {
                     logger.warn("Scanning base directory: ${baseDir.path} (max depth: 2)")
                     scanDirectoryForDockerCompose(baseDir, files, currentDepth = 0, maxDepth = 2)

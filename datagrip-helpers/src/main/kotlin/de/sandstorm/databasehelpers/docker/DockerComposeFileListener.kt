@@ -3,6 +3,7 @@ package de.sandstorm.databasehelpers.docker
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
@@ -43,7 +44,7 @@ class DockerComposeFileListener : BulkFileListener {
         }
 
         // Check depth limit (max 2 levels deep from project root)
-        val baseDir = project.baseDir
+        val baseDir = project.guessProjectDir()
         if (baseDir != null) {
             val depth = calculateDepth(baseDir.path, file.path)
             if (depth > 2) {
