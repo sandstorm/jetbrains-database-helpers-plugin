@@ -3,7 +3,6 @@ package de.sandstorm.databasehelpers;
 import com.intellij.credentialStore.OneTimeString
 import com.intellij.database.access.DatabaseCredentials
 import com.intellij.database.dataSource.*
-import com.intellij.database.dataSource.validation.DatabaseDriverValidator
 import com.intellij.database.model.ObjectKind
 import com.intellij.database.model.ObjectName
 import com.intellij.database.psi.DbDataSource
@@ -16,11 +15,11 @@ import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.ApplicationStarter
 import com.intellij.openapi.application.invokeLater
-import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.WindowManager
 import com.intellij.util.OpenSourceUtil
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
@@ -43,13 +42,11 @@ class OpenerCommandLine : ApplicationStarter {
         """.trimIndent()*/
 
     override fun main(args: List<String>){
-        val driverName = args[1] // like postgresql
-        val connectionUrl = args[2]
-        val user = args[3]
-        val password = args[4]
-        val optionalName = args[5]
-
-        process(driverName, connectionUrl, user, password, optionalName)
+        // This method is called when starting a fresh IDE instance
+        // For this plugin to work, DataGrip/IDEA must already be running
+        System.err.println("ERROR: DataGrip/IDEA must already be running to use this command.")
+        System.err.println("Please start DataGrip first, then run this command again.")
+        kotlin.system.exitProcess(1)
     }
 
 
@@ -186,10 +183,10 @@ class OpenerCommandLine : ApplicationStarter {
                             // Silently fail - schema selection will need to be done manually
                         }
 
-                        indicator.text = "Downloading database drivers..."
-                        downloadDrivers(ds)
+                        indicator.text = "Preparing data source..."
+                        // Note: Driver download is handled automatically by DataGrip when connecting
+                        // No need to call DatabaseDriverValidator which has incompatible API in 2025.2.4
 
-                        indicator.text = "Connecting and syncing schema..."
                         // Get the DbDataSource for further operations
                         val dbDataSource: DbDataSource? = DbImplUtil.getDbDataSource(project, ds)
 
@@ -197,6 +194,14 @@ class OpenerCommandLine : ApplicationStarter {
                             // Open/navigate to the data source (opens console) - must be done on EDT
                             // This will automatically trigger connection and schema sync
                             invokeLater {
+                                // Bring IDE window to front and request focus
+                                val frame = WindowManager.getInstance().getFrame(project)
+                                if (frame != null) {
+                                    frame.toFront()
+                                    frame.requestFocus()
+                                }
+
+                                // Navigate to and focus on the newly created data source
                                 OpenSourceUtil.navigate(true, true, dbDataSource)
                             }
                         }
@@ -207,17 +212,6 @@ class OpenerCommandLine : ApplicationStarter {
                     }
                 }
             })
-        }
-
-        // see https://github.com/kassak/dg-exposer/blob/d944fdcbb77b47bc37501f4b223427f7c0435112/dg-exposer/main/src/com/github/kassak/intellij/expose/ProjectHandler.java#L131
-        private fun downloadDrivers(ds: LocalDataSource) {
-            if (DbImplUtil.hasDriverFiles(ds)) return
-            val driver = ds.databaseDriver
-            if (driver != null && driver.artifacts.size > 0) {
-                val task = DatabaseDriverValidator.createDownloaderTask(ds, null)
-                task.run(EmptyProgressIndicator())
-            }
-
         }
     }
 }

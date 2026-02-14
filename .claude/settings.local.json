@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew dependencies:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(./gradlew build:*)",
+      "Bash(./gradlew clean:*)",
+      "Bash(./gradlew verifyPlugin:*)"
+    ]
+  }
+}
