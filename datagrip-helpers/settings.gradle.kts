@@ -1,1 +1,1 @@
-rootProject.name = "datagrip-helpers"
+rootProject.name = "databasehelpers"

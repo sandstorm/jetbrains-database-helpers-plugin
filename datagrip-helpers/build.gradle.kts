@@ -1,5 +1,3 @@
-import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
-import org.jetbrains.intellij.platform.gradle.ProductMode
 
 plugins {
     id("java")
@@ -7,8 +5,8 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.10.2"
 }
 
-group = "de.sandstorm.datagrip-helpers"
-version = "1.0-SNAPSHOT"
+group = "de.sandstorm.databasehelpers"
+version = "0.5.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
