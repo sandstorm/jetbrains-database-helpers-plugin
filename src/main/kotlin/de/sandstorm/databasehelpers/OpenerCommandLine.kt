@@ -126,29 +126,41 @@ class OpenerCommandLine : ApplicationStarter {
                     // Get project-specific data source storage
                     val storage = LocalDataSourceManager.getInstance(currentProject)
 
-                    // Remove any existing data sources with the same name or URL
-                    storage.dataSources.filter { el ->
-                        el.name == targetName || el.url == connectionUrl
-                    }.forEach { existingDs ->
-                        storage.removeDataSource(existingDs)
+                    // Find existing data source with the same name
+                    val existingDs = storage.dataSources.find { el -> el.name == targetName }
+
+                    if (existingDs != null) {
+                        // Update existing data source to preserve UUID
+                        val ds = existingDs.apply {
+                            databaseDriver = driver
+                            url = connectionUrl
+                            username = user
+                            passwordStorage = LocalDataSource.Storage.PERSIST
+                            if (comment != null) {
+                                this.comment = comment
+                            }
+                            isAutoSynchronize = true
+                        }
+                        // Move slow operations to background task
+                        runBackgroundTask(currentProject, ds, password, future)
+                    } else {
+                        // Create new data source only if it doesn't exist
+                        val ds = LocalDataSource().apply {
+                            name = targetName
+                            databaseDriver = driver
+                            url = connectionUrl
+                            username = user
+                            passwordStorage = LocalDataSource.Storage.PERSIST
+                            if (comment != null) {
+                                this.comment = comment
+                            }
+                            isAutoSynchronize = true
+                        }
+                        storage.addDataSource(ds)
+                        // Move slow operations to background task
+                        runBackgroundTask(currentProject, ds, password, future)
                     }
 
-                    // Create new data source with current settings (quick UI operation)
-                    val ds = LocalDataSource()
-                    ds.name = targetName
-                    ds.databaseDriver = driver
-                    ds.url = connectionUrl
-                    ds.username = user
-                    ds.passwordStorage = LocalDataSource.Storage.PERSIST
-                    if (comment != null) {
-                        ds.comment = comment
-                    }
-                    ds.isAutoSynchronize = true
-
-                    storage.addDataSource(ds)
-
-                    // Move slow operations to background task
-                    runBackgroundTask(currentProject, ds, password, future)
                 } catch (e: Exception) {
                     future.completeExceptionally(e)
                 }

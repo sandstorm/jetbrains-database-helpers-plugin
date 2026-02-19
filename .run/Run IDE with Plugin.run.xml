@@ -2,6 +2,12 @@
   <configuration default="false" name="Run IDE with Plugin" type="GradleRunConfiguration" factoryName="Gradle">
     <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/system/log/idea.log" />
     <ExternalSystemSettings>
+      <option name="env">
+        <map>
+          <entry key="PATH" value="$USER_HOME$/.local/share/mise/installs/node/24.11.1/bin:$USER_HOME$/.local/share/mise/installs/ripgrep/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin:$USER_HOME$/.local/share/mise/installs/npm-yarn/1.22.22/bin:$USER_HOME$/.local/share/mise/installs/github-composer-composer/2.9.2:$USER_HOME$/.local/share/mise/installs/bitwarden/2025.12.0:$USER_HOME$/.local/share/mise/installs/crane/0.20.7:$USER_HOME$/.local/share/mise/installs/usql/0.20.0:$USER_HOME$/.lmstudio/bin:/tools:/platform-tools/::$USER_HOME$/.pub-cache/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Applications/Wireshark.app/Contents/MacOS:$USER_HOME$/.cargo/bin:/Applications/iTerm.app/Contents/Resources/utilities:$USER_HOME$/Library/Application Support/JetBrains/Toolbox/scripts:$USER_HOME$/.orbstack/bin:$USER_HOME$/.composer/vendor/bin" />
+          <entry key="_MISE_PLUGIN_ENV_VARS_CUSTOMIZATION" value="done" />
+        </map>
+      </option>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
       <option name="externalSystemIdString" value="GRADLE" />

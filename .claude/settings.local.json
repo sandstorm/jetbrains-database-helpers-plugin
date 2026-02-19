@@ -8,5 +8,9 @@
       "Bash(./gradlew clean:*)",
       "Bash(./gradlew verifyPlugin:*)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
   }
 }
