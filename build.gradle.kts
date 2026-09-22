@@ -1,11 +1,13 @@
 
 import org.gradle.api.provider.ValueSource
 import org.gradle.api.provider.ValueSourceParameters
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.1.20"
-    id("org.jetbrains.intellij.platform") version "2.10.2"
+    id("org.jetbrains.kotlin.jvm") version "2.4.20"
+    id("org.jetbrains.intellij.platform") version "2.19.0"
 }
 
 // ValueSource for configuration-cache-compatible git version computation
@@ -61,22 +63,28 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
-        datagrip("2025.2.4")
+        datagrip("2026.2.5")
 
         // Explicitly add plugins that need ultimate
         bundledPlugin("com.intellij.database")
         //bundledPlugin("com.intellij.java")
+
+        // Headless IDE fixture used by the end-to-end tests
+        testFramework(TestFrameworkType.Platform)
     }
 
+    // The platform test framework is JUnit 3/4 based, so JUnit 4 is required.
+    testImplementation("junit:junit:4.13.2")
+
     // Jackson YAML for parsing docker-compose files
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.0")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.0")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.20.0")
 }
 
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "252.25557"
+            sinceBuild = "262.10315"
         }
 
         changeNotes = """
@@ -84,19 +92,35 @@ intellijPlatform {
         """.trimIndent()
     }
 
-    sandboxContainer = file("${project.buildDir}/idea-sandbox-ultimate")
+    sandboxContainer = layout.buildDirectory.dir("idea-sandbox-ultimate")
+
+    pluginVerification {
+        ides {
+            create(IntelliJPlatformType.DataGrip, "2026.2.5")
+        }
+    }
 }
 
 tasks {
     // Set the JVM compatibility versions
     withType<JavaCompile> {
-        sourceCompatibility = "21"
-        targetCompatibility = "21"
+        sourceCompatibility = "25"
+        targetCompatibility = "25"
+    }
+
+    test {
+        // BasePlatformTestCase is JUnit 3/4 based - do NOT switch to useJUnitPlatform().
+        // The headless IDE fixture needs more heap than the Gradle default.
+        maxHeapSize = "2g"
+        testLogging {
+            events("passed", "skipped", "failed")
+            showStandardStreams = true
+        }
     }
 }
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
     }
 }

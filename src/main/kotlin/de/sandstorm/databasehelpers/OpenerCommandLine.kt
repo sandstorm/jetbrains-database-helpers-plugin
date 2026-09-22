@@ -13,6 +13,7 @@ import com.intellij.database.util.TreePatternUtils
 import com.intellij.ide.CliResult
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationStarter
 import com.intellij.openapi.application.invokeLater
 import com.intellij.openapi.progress.ProgressIndicator
@@ -202,7 +203,7 @@ class OpenerCommandLine : ApplicationStarter {
                         // Get the DbDataSource for further operations
                         val dbDataSource: DbDataSource? = DbImplUtil.getDbDataSource(project, ds)
 
-                        if (dbDataSource != null) {
+                        if (dbDataSource != null && !ApplicationManager.getApplication().isHeadlessEnvironment) {
                             // Open/navigate to the data source (opens console) - must be done on EDT
                             // This will automatically trigger connection and schema sync
                             invokeLater {

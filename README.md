@@ -57,6 +57,12 @@ datagrip opensql postgresql jdbc:postgresql://localhost:5432/postgres admin pass
 ./gradlew runIde
 ```
 
+### Testing
+
+```bash
+./gradlew test
+```
+
 ### Verifying Plugin Compatibility
 
 ```bash
