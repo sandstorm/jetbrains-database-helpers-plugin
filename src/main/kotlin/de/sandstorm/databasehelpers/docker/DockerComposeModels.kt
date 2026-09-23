@@ -14,8 +14,23 @@ data class Service(
     val image: String? = null,
     val ports: List<String>? = null,
     val environment: Any? = null, // Can be List<String> or Map<String, String>
+    @JsonProperty("env_file") val envFile: Any? = null, // Can be a single path or a list of them
     @JsonProperty("container_name") val containerName: String? = null
 ) {
+    /** The `env_file` paths, relative to the compose file, in the order compose applies them. */
+    fun getEnvFilePaths(): List<String> = when (envFile) {
+        is String -> listOf(envFile)
+        is List<*> -> envFile.mapNotNull { entry ->
+            when (entry) {
+                is String -> entry
+                // The long form is `- path: .env.db` with optional `required:`.
+                is Map<*, *> -> entry["path"]?.toString()
+                else -> null
+            }
+        }
+        else -> emptyList()
+    }
+
     fun getEnvironmentMap(): Map<String, String> {
         return when (environment) {
             is Map<*, *> -> environment.mapKeys { it.key.toString() }.mapValues { it.value.toString() }

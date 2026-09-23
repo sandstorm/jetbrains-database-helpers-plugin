@@ -12,7 +12,6 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 
 class DockerComposeFileListener : BulkFileListener {
     private val logger = Logger.getInstance(DockerComposeFileListener::class.java)
-    private val parser = DockerComposeParser()
     private val creator = DataSourceCreator()
 
     override fun after(events: List<VFileEvent>) {
@@ -56,27 +55,7 @@ class DockerComposeFileListener : BulkFileListener {
 
         ApplicationManager.getApplication().invokeLater {
             try {
-                file.inputStream.use { inputStream ->
-                    val compose = parser.parse(inputStream)
-                    if (compose == null) {
-                        logger.info("Failed to parse docker-compose file: ${file.name}")
-                        return@invokeLater
-                    }
-
-                    val databases = parser.extractDatabaseConnections(compose)
-                    logger.info("Parsed ${file.name}: found ${databases.size} database service(s)")
-
-                    if (databases.isEmpty()) {
-                        logger.info("No database services found in ${file.name}, skipping data source creation")
-                        return@invokeLater
-                    }
-
-                    databases.forEach { db ->
-                        logger.info("  - ${db.serviceName} (${db.databaseType}) on port ${db.port}")
-                    }
-
-                    creator.createOrUpdateDataSources(project, databases, file)
-                }
+                creator.createOrUpdateDataSources(project, file)
             } catch (e: Exception) {
                 logger.warn("Failed to process docker-compose file change: ${file.path}", e)
             }

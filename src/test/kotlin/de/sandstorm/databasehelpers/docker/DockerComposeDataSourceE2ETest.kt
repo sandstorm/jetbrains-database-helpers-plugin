@@ -21,7 +21,6 @@ import kotlinx.coroutines.runBlocking
  */
 class DockerComposeDataSourceE2ETest : BasePlatformTestCase() {
 
-    private val parser = DockerComposeParser()
     private val creator = DataSourceCreator()
 
     private val dataSourceManager: LocalDataSourceManager
@@ -42,9 +41,7 @@ class DockerComposeDataSourceE2ETest : BasePlatformTestCase() {
 
     /** Runs the production path: parse the file, then create data sources from it. */
     private fun importDataSources(file: VirtualFile) {
-        val compose = file.inputStream.use { parser.parse(it) }
-            ?: throw AssertionError("compose file failed to parse")
-        creator.createOrUpdateDataSources(project, parser.extractDatabaseConnections(compose), file)
+        creator.createOrUpdateDataSources(project, file)
 
         // Data sources are registered from an invokeLater, which is still queued at this point.
         PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
@@ -184,6 +181,54 @@ class DockerComposeDataSourceE2ETest : BasePlatformTestCase() {
         )
 
         assertEmpty(dataSourceManager.dataSources)
+    }
+
+    /**
+     * The `.env` file next to the compose file supplies the placeholder values, exactly as
+     * `docker compose up` would resolve them.
+     */
+    fun testPlaceholdersAreResolvedFromTheEnvFileNextToTheComposeFile() {
+        myFixture.addFileToProject(".env", "DB_PORT=15432\nDB_USER=neos\nDB_PASSWORD=secret\n")
+        importDataSources(
+            composeFile(
+                """
+                services:
+                  db:
+                    image: postgres:16
+                    ports:
+                      - "127.0.0.1:${'$'}{DB_PORT}:5432"
+                    environment:
+                      POSTGRES_DB: ${'$'}{DB_NAME:-myapp}
+                      POSTGRES_USER: ${'$'}{DB_USER}
+                      POSTGRES_PASSWORD: ${'$'}{DB_PASSWORD}
+                """
+            )
+        )
+
+        val ds = dataSourceNamed("Docker: db")
+        assertEquals("jdbc:postgresql://localhost:15432/myapp", ds.url)
+        assertEquals("neos", ds.username)
+    }
+
+    /** A service's `env_file` is resolved relative to the compose file, as compose does. */
+    fun testCredentialsAreReadFromAServiceEnvFile() {
+        myFixture.addFileToProject("config/db.env", "POSTGRES_USER=fromfile\nPOSTGRES_DB=fromfile_db\n")
+        importDataSources(
+            composeFile(
+                """
+                services:
+                  db:
+                    image: postgres:16
+                    env_file: config/db.env
+                    ports:
+                      - "15432:5432"
+                """
+            )
+        )
+
+        val ds = dataSourceNamed("Docker: db")
+        assertEquals("fromfile", ds.username)
+        assertEquals("jdbc:postgresql://localhost:15432/fromfile_db", ds.url)
     }
 
     /**

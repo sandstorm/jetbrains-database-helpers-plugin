@@ -35,6 +35,36 @@ Creates data source: **Docker: postgres** → `jdbc:postgresql://localhost:15432
 
 Each data source includes a comment noting it was auto-created from the docker-compose file.
 
+**Variables and `.env` files:**
+
+Placeholders are resolved the way `docker compose` resolves them — from the `.env` file beside
+the compose file, with the real environment taking precedence, and with `${VAR:-default}` /
+`${VAR-default}` defaults supported (`$$` escapes a literal dollar). A service's `env_file:`
+entries are read too, with an inline `environment:` entry winning over them.
+
+```yaml
+# .env
+DB_PORT=15432
+DB_PASSWORD=secret
+```
+
+```yaml
+services:
+  postgres:
+    image: postgres:14
+    env_file: config/db.env
+    ports:
+      - "127.0.0.1:${DB_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mydb}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+```
+
+**Port mappings:** the `HOST:CONTAINER`, `BIND_IP:HOST:CONTAINER` and `/tcp`-suffixed forms are
+all understood, and where a service publishes several ports the one whose container side is the
+database's own port is used. A bind address is only used to find the port — the JDBC host is
+always `localhost`.
+
 ### 📟 Command Line Interface
 
 Open database connections from the command line:

@@ -1,8 +1,6 @@
 package de.sandstorm.databasehelpers.docker
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,14 +11,13 @@ import org.junit.Test
  */
 class DockerComposeParserTest {
 
-    private val parser = DockerComposeParser()
-
-    private fun parse(yaml: String): DockerCompose =
-        parser.parse(yaml.trimIndent().byteInputStream())
-            ?: throw AssertionError("compose file failed to parse")
-
-    private fun databasesIn(yaml: String): List<DatabaseInfo> =
-        parser.extractDatabaseConnections(parse(yaml))
+    /** @param variables stands in for the real environment, so the host's own cannot leak in. */
+    private fun databasesIn(
+        yaml: String,
+        variables: Map<String, String> = emptyMap(),
+        siblingFile: (String) -> String? = { null }
+    ): List<DatabaseInfo> =
+        DockerComposeParser(environment = variables).parseDatabases(yaml.trimIndent(), siblingFile)
 
     @Test
     fun `postgres service with environment map is detected`() {
@@ -209,7 +206,7 @@ class DockerComposeParserTest {
 
     @Test
     fun `unknown top-level keys do not break parsing`() {
-        val compose = parse(
+        val databases = databasesIn(
             """
             name: myproject
             volumes:
@@ -226,23 +223,136 @@ class DockerComposeParserTest {
             """
         )
 
-        assertNotNull(compose)
-        assertEquals(1, parser.extractDatabaseConnections(compose).size)
+        assertEquals(1, databases.size)
     }
 
     @Test
-    fun `malformed yaml returns null rather than throwing`() {
-        assertNull(parser.parse("this: is: not: valid: yaml:\n  - [".byteInputStream()))
+    fun `malformed yaml yields no databases rather than throwing`() {
+        assertTrue(databasesIn("this: is: not: valid: yaml:\n  - [").isEmpty())
     }
 
-    /**
-     * Documents current behaviour, which is not what you would want: a published port that
-     * carries a host interface (the documented "[HOST:]HOST_PORT:CONTAINER_PORT" form) is
-     * not understood, so the service silently falls back to the driver default port. See the
-     * note in the README about `extractHostPort`.
-     */
     @Test
-    fun `host-qualified port mappings are currently not parsed`() {
+    fun `credentials come from an env_file, but an explicit environment entry wins`() {
+        val db = databasesIn(
+            """
+            services:
+              db:
+                image: postgres:16
+                env_file: .env.db
+                environment:
+                  POSTGRES_USER: explicit
+            """
+        ) { path ->
+            if (path == ".env.db") "POSTGRES_USER=fromfile\nPOSTGRES_PASSWORD=filepw" else null
+        }.single()
+
+        assertEquals("explicit", db.username)
+        assertEquals("filepw", db.password)
+    }
+
+    @Test
+    fun `a doubled dollar escapes a literal dollar`() {
+        val db = databasesIn(
+            """
+            services:
+              db:
+                image: postgres:16
+                environment:
+                  POSTGRES_PASSWORD: "p${'$'}${'$'}${'$'}${'$'}word"
+            """,
+            variables = mapOf("word" to "NOPE")
+        ).single()
+
+        assertEquals("p${'$'}${'$'}word", db.password)
+    }
+
+    @Test
+    fun `a braceless placeholder is substituted`() {
+        val db = databasesIn(
+            """
+            services:
+              db:
+                image: postgres:16
+                environment:
+                  POSTGRES_PASSWORD: ${'$'}DB_PASSWORD
+            """,
+            variables = mapOf("DB_PASSWORD" to "secret")
+        ).single()
+
+        assertEquals("secret", db.password)
+    }
+
+    @Test
+    fun `a placeholder default is used only when the variable is absent`() {
+        val yaml =
+            """
+            services:
+              db:
+                image: postgres:16
+                ports:
+                  - "${'$'}{DB_PORT:-15432}:5432"
+                environment:
+                  POSTGRES_USER: ${'$'}{DB_USER:-postgres}
+            """
+
+        val fallback = databasesIn(yaml).single()
+        assertEquals(15432, fallback.port)
+        assertEquals("postgres", fallback.username)
+
+        val overridden = databasesIn(yaml, variables = mapOf("DB_PORT" to "25432", "DB_USER" to "neos")).single()
+        assertEquals(25432, overridden.port)
+        assertEquals("neos", overridden.username)
+    }
+
+    @Test
+    fun `a placeholder is substituted from the supplied variables`() {
+        val db = databasesIn(
+            """
+            services:
+              db:
+                image: postgres:16
+                ports:
+                  - "${'$'}{DB_PORT}:5432"
+            """,
+            variables = mapOf("DB_PORT" to "15432")
+        ).single()
+
+        assertEquals(15432, db.port)
+    }
+
+    @Test
+    fun `the mapping for the database port wins over other published ports`() {
+        val db = databasesIn(
+            """
+            services:
+              db:
+                image: postgres:16
+                ports:
+                  - "9187:9187"
+                  - "15432:5432"
+            """
+        ).single()
+
+        assertEquals(15432, db.port)
+    }
+
+    @Test
+    fun `a protocol suffix on a port mapping is ignored`() {
+        val db = databasesIn(
+            """
+            services:
+              db:
+                image: postgres:16
+                ports:
+                  - "15432:5432/tcp"
+            """
+        ).single()
+
+        assertEquals(15432, db.port)
+    }
+
+    @Test
+    fun `a host-qualified port mapping publishes the host port`() {
         val db = databasesIn(
             """
             services:
@@ -253,6 +363,7 @@ class DockerComposeParserTest {
             """
         ).single()
 
-        assertEquals("falls back to the default port instead of 15432", 5432, db.port)
+        assertEquals(15432, db.port)
+        assertEquals("jdbc:postgresql://localhost:15432/postgres", db.toJdbcUrl())
     }
 }

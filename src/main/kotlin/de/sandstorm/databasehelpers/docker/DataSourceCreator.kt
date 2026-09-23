@@ -9,10 +9,20 @@ import de.sandstorm.databasehelpers.OpenerCommandLine
 
 class DataSourceCreator {
     private val logger = Logger.getInstance(DataSourceCreator::class.java)
+    private val parser = DockerComposeParser()
 
-    fun createOrUpdateDataSources(project: Project, databases: List<DatabaseInfo>, sourceFile: VirtualFile) {
+    fun createOrUpdateDataSources(project: Project, sourceFile: VirtualFile) {
+        val directory = sourceFile.parent
+        val databases = parser.parseDatabases(textOf(sourceFile)) { path ->
+            directory?.findFileByRelativePath(path)?.let(::textOf)
+        }
+
+        logger.info("Found ${databases.size} database service(s) in ${sourceFile.path}")
         if (databases.isEmpty()) {
             return
+        }
+        databases.forEach { db ->
+            logger.info("  - ${db.serviceName} (${db.databaseType}) on port ${db.port}")
         }
 
         val successCount = databases.count { dbInfo ->
@@ -34,6 +44,8 @@ class DataSourceCreator {
             )
         }
     }
+
+    private fun textOf(file: VirtualFile): String = String(file.contentsToByteArray(), file.charset)
 
     private fun createDataSource(project: Project, dbInfo: DatabaseInfo, sourceFile: VirtualFile) {
         val dataSourceName = "Docker: ${dbInfo.serviceName}"

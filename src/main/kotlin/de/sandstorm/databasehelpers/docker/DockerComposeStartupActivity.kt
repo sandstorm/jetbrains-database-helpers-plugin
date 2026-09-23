@@ -10,7 +10,6 @@ import com.intellij.openapi.vfs.VirtualFile
 
 class DockerComposeStartupActivity : ProjectActivity, DumbAware {
     private val logger = Logger.getInstance(DockerComposeStartupActivity::class.java)
-    private val parser = DockerComposeParser()
     private val creator = DataSourceCreator()
 
     override suspend fun execute(project: Project) {
@@ -75,18 +74,7 @@ class DockerComposeStartupActivity : ProjectActivity, DumbAware {
     private fun processDockerComposeFile(project: Project, file: VirtualFile) {
         try {
             logger.info("Processing docker-compose file: ${file.path}")
-
-            file.inputStream.use { inputStream ->
-                val compose = parser.parse(inputStream) ?: return
-                val databases = parser.extractDatabaseConnections(compose)
-
-                logger.info("Found ${databases.size} database service(s) in ${file.name}")
-                databases.forEach { db ->
-                    logger.info("  - ${db.serviceName} (${db.databaseType}) on port ${db.port}")
-                }
-
-                creator.createOrUpdateDataSources(project, databases, file)
-            }
+            creator.createOrUpdateDataSources(project, file)
         } catch (e: Exception) {
             logger.warn("Failed to process docker-compose file: ${file.path}", e)
         }
